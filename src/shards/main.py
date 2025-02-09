@@ -8,21 +8,21 @@ mnemo = Mnemonic("english")
 
 
 # Utility functions
-def validate_mnemonic(phrase):
+def validate_mnemonic(phrase: str) -> None:
     if not mnemo.check(phrase):
         raise ValueError("Invalid mnemonic phrase provided.")
 
 
-def phrase_to_entropy(phrase):
+def phrase_to_entropy(phrase: str) -> bytearray:
     validate_mnemonic(phrase)
     return mnemo.to_entropy(phrase)
 
 
-def entropy_to_phrase(entropy):
+def entropy_to_phrase(entropy: bytes) -> str:
     return mnemo.to_mnemonic(entropy)
 
 
-def prompt_for_phrase(prompt):
+def prompt_for_phrase(prompt: str) -> str:
     print(prompt)
     words = []
     i = 0
@@ -36,7 +36,7 @@ def prompt_for_phrase(prompt):
     return " ".join(words)
 
 
-def prompt_for_shares(count):
+def prompt_for_shares(count: int) -> list[str]:
     shares = []
     for i in range(count):
         share = prompt_for_phrase(
@@ -47,18 +47,18 @@ def prompt_for_shares(count):
 
 
 # Shamir's Secret Sharing wrapper
-def split_secret(entropy, n, k):
+def split_secret(entropy: bytearray, n: int, k: int):
     hex_secret = entropy.hex()
     shares = PlaintextToHexSecretSharer.split_secret(hex_secret, k, n)
     return shares
 
 
-def recover_secret(shares):
+def recover_secret(shares: list[str]) -> str:
     return PlaintextToHexSecretSharer.recover_secret(shares)
 
 
 # CLI functionality
-def create_shares(mnemonic, n, k, output_dir):
+def create_shares(mnemonic: str, n: int, k: int, output_dir: str | None) -> None:
     entropy = phrase_to_entropy(mnemonic)
     shares = split_secret(entropy, n, k)
 
@@ -77,7 +77,7 @@ def create_shares(mnemonic, n, k, output_dir):
             print(f"Share {i + 1}: {share}")
 
 
-def recover_phrase(shares):
+def recover_phrase(shares: list[str]) -> None:
     recovered_entropy_hex = recover_secret(shares)
     recovered_entropy = bytes.fromhex(recovered_entropy_hex)
     mnemonic = entropy_to_phrase(recovered_entropy)
