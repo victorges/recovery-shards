@@ -25,9 +25,14 @@ def entropy_to_phrase(entropy):
 def prompt_for_phrase(prompt):
     print(prompt)
     words = []
-    for i in range(1, 25):
-        word = input(f"Word {i}: ").strip()
+    i = 0
+    while i < 24:
+        word = input(f"Word {i}: ").strip().lower()
+        if word not in mnemo.wordlist:
+            print(f"Invalid word: {word}")
+            continue
         words.append(word)
+        i += 1
     return " ".join(words)
 
 
@@ -125,7 +130,7 @@ def main():
                 "Enter your 24-word recovery phrase, one word at a time:"
             )
             create_shares(mnemonic, args.n, args.k, args.output)
-        except ValueError as e:
+        except Exception as e:
             print(f"Error: {e}")
             sys.exit(1)
 
