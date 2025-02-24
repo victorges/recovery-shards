@@ -5,34 +5,29 @@ import (
 
 	"github.com/hashicorp/vault/shamir"
 	"github.com/tyler-smith/go-bip39"
+	"github.com/victorges/recovery-shards/model"
 )
 
-type ShareInfo struct {
-	Identifier byte
-	Data       []byte
-}
-
-func Recover(shares []ShareInfo) error {
-	// Reconstruct complete shares
+func Recover(shares []model.MnemonicShare) (string, error) {
+	// Convert mnemonics to entropy
 	completeShares := make([][]byte, len(shares))
 	for i, share := range shares {
-		completeShare := make([]byte, len(share.Data)+shamir.ShareOverhead)
-		copy(completeShare, share.Data)
-		completeShare[len(share.Data)] = share.Identifier
-		completeShares[i] = completeShare
+		shamirShare, err := share.ToShamir()
+		if err != nil {
+			return "", fmt.Errorf("failed to convert share %d to shamir share: %w", i+1, err)
+		}
+		completeShares[i] = shamirShare
 	}
 
 	recoveredEntropy, err := shamir.Combine(completeShares)
 	if err != nil {
-		return fmt.Errorf("failed to recover secret: %w", err)
+		return "", fmt.Errorf("failed to recover secret: %w", err)
 	}
 
 	mnemonic, err := bip39.NewMnemonic(recoveredEntropy)
 	if err != nil {
-		return fmt.Errorf("failed to generate mnemonic: %w", err)
+		return "", fmt.Errorf("failed to generate mnemonic: %w", err)
 	}
 
-	fmt.Println("Recovered mnemonic phrase:")
-	fmt.Printf("\n%s\n", mnemonic)
-	return nil
+	return mnemonic, nil
 }

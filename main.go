@@ -11,6 +11,7 @@ import (
 
 	"github.com/tyler-smith/go-bip39"
 	"github.com/victorges/recovery-shards/command"
+	"github.com/victorges/recovery-shards/model"
 )
 
 func promptForPhrase(prompt string) (string, error) {
@@ -37,8 +38,8 @@ func promptForPhrase(prompt string) (string, error) {
 	return strings.Join(words, " "), nil
 }
 
-func promptForShares(count int) ([]command.ShareInfo, error) {
-	shares := make([]command.ShareInfo, 0, count)
+func promptForShares(count int) ([]model.MnemonicShare, error) {
+	shares := make([]model.MnemonicShare, 0, count)
 	for i := 0; i < count; i++ {
 		fmt.Printf("\nShare %d:\n", i+1)
 		fmt.Print("Identifier (hex): ")
@@ -58,32 +59,24 @@ func promptForShares(count int) ([]command.ShareInfo, error) {
 		if !reader.Scan() {
 			return nil, fmt.Errorf("failed to read mnemonic")
 		}
-		shareMnemonic := strings.TrimSpace(reader.Text())
+		mnemonic := strings.TrimSpace(reader.Text())
 
-		if !bip39.IsMnemonicValid(shareMnemonic) {
-			return nil, fmt.Errorf("invalid mnemonic phrase")
-		}
-
-		entropy, err := bip39.EntropyFromMnemonic(shareMnemonic)
+		share, err := model.NewMnemonicShare(identifier[0], mnemonic)
 		if err != nil {
-			return nil, fmt.Errorf("failed to process mnemonic: %w", err)
+			return nil, fmt.Errorf("failed to create mnemonic share: %w", err)
 		}
-
-		shares = append(shares, command.ShareInfo{
-			Identifier: identifier[0],
-			Data:       entropy,
-		})
+		shares = append(shares, share)
 	}
 	return shares, nil
 }
 
-func readSharesFromDirectory(directory string) ([]command.ShareInfo, error) {
+func readSharesFromDirectory(directory string) ([]model.MnemonicShare, error) {
 	files, err := os.ReadDir(directory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
-	shares := make([]command.ShareInfo, 0, len(files))
+	shares := make([]model.MnemonicShare, 0, len(files))
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -101,31 +94,43 @@ func readSharesFromDirectory(directory string) ([]command.ShareInfo, error) {
 
 		var identifierHex string
 		fmt.Sscanf(lines[0], "Identifier: %s", &identifierHex)
-
-		var shareMnemonic string
-		fmt.Sscanf(lines[1], "Mnemonic: %s", &shareMnemonic)
-		shareMnemonic = strings.TrimPrefix(lines[1], "Mnemonic: ")
-
 		identifier, err := hex.DecodeString(identifierHex)
 		if err != nil || len(identifier) != 1 {
 			return nil, fmt.Errorf("invalid identifier format in file")
 		}
+		mnemonic := strings.TrimPrefix(lines[1], "Mnemonic: ")
 
-		if !bip39.IsMnemonicValid(shareMnemonic) {
-			return nil, fmt.Errorf("invalid mnemonic in file")
-		}
-
-		entropy, err := bip39.EntropyFromMnemonic(shareMnemonic)
+		share, err := model.NewMnemonicShare(identifier[0], mnemonic)
 		if err != nil {
-			return nil, fmt.Errorf("failed to process mnemonic: %w", err)
+			return nil, fmt.Errorf("failed to create mnemonic share: %w", err)
 		}
-
-		shares = append(shares, command.ShareInfo{
-			Identifier: identifier[0],
-			Data:       entropy,
-		})
+		shares = append(shares, share)
 	}
 	return shares, nil
+}
+
+func writeShares(shares []model.MnemonicShare, outputDir string) error {
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	for i, share := range shares {
+		filename := filepath.Join(outputDir, fmt.Sprintf("share_%d.txt", i+1))
+		content := fmt.Sprintf("Identifier: %02x\nMnemonic: %s", share.Identifier, share.Mnemonic)
+
+		if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
+			return fmt.Errorf("failed to write share file: %w", err)
+		}
+		fmt.Printf("Saved share %d to %s\n", i+1, filename)
+	}
+	return nil
+}
+
+func printShares(shares []model.MnemonicShare) {
+	fmt.Println("Shares:")
+	for i, share := range shares {
+		fmt.Printf("Share %d:\n\tIdentifier: %02x\n\tMnemonic: %s\n", i+1, share.Identifier, share.Mnemonic)
+	}
 }
 
 func main() {
@@ -151,14 +156,27 @@ func main() {
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
 		}
-		if err := command.Split(mnemonic, *splitN, *splitK, *splitOutput); err != nil {
+
+		shares, err := command.Split(mnemonic, *splitN, *splitK)
+		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
 		}
 
+		fmt.Printf("Generated %d shares with a %d-out-of-%d threshold.\n", *splitN, *splitK, *splitN)
+
+		if *splitOutput != "" {
+			if err := writeShares(shares, *splitOutput); err != nil {
+				fmt.Printf("Error: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			printShares(shares)
+		}
+
 	case "recover":
 		recoverCmd.Parse(os.Args[2:])
-		var shares []command.ShareInfo
+		var shares []model.MnemonicShare
 		var err error
 
 		if *recoverDir != "" {
@@ -183,10 +201,14 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err := command.Recover(shares); err != nil {
+		mnemonic, err := command.Recover(shares)
+		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
 		}
+
+		fmt.Println("Recovered mnemonic phrase:")
+		fmt.Printf("\n%s\n", mnemonic)
 
 	default:
 		fmt.Printf("Unknown command: %s\n", os.Args[1])
