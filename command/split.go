@@ -33,8 +33,13 @@ func Split(mnemonic string, n, k int, outputDir string) error {
 
 		for i, share := range shares {
 			identifier, data := splitShare(share)
+			shareMnemonic, err := bip39.NewMnemonic(data)
+			if err != nil {
+				return fmt.Errorf("failed to generate mnemonic for share: %w", err)
+			}
+
 			filename := filepath.Join(outputDir, fmt.Sprintf("share_%d.txt", i+1))
-			content := fmt.Sprintf("Identifier: %02x\nData: %x", identifier, data)
+			content := fmt.Sprintf("Identifier: %02x\nMnemonic: %s", identifier, shareMnemonic)
 
 			if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
 				return fmt.Errorf("failed to write share file: %w", err)
@@ -45,7 +50,11 @@ func Split(mnemonic string, n, k int, outputDir string) error {
 		fmt.Println("Shares:")
 		for i, share := range shares {
 			identifier, data := splitShare(share)
-			fmt.Printf("Share %d:\n\tIdentifier: %02x\n\tData: %x\n", i+1, identifier, data)
+			shareMnemonic, err := bip39.NewMnemonic(data)
+			if err != nil {
+				return fmt.Errorf("failed to generate mnemonic for share: %w", err)
+			}
+			fmt.Printf("Share %d:\n\tIdentifier: %02x\n\tMnemonic: %s\n", i+1, identifier, shareMnemonic)
 		}
 	}
 

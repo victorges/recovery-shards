@@ -40,7 +40,7 @@ func promptForPhrase(prompt string) (string, error) {
 func promptForShares(count int) ([]command.ShareInfo, error) {
 	shares := make([]command.ShareInfo, 0, count)
 	for i := 0; i < count; i++ {
-		fmt.Printf("Share %d:\n", i+1)
+		fmt.Printf("\nShare %d:\n", i+1)
 		fmt.Print("Identifier (hex): ")
 
 		var identifierHex string
@@ -53,20 +53,25 @@ func promptForShares(count int) ([]command.ShareInfo, error) {
 			return nil, fmt.Errorf("invalid identifier format")
 		}
 
-		fmt.Print("Data (hex): ")
-		var dataHex string
-		if _, err := fmt.Scanln(&dataHex); err != nil {
-			return nil, fmt.Errorf("failed to read data: %w", err)
+		fmt.Println("Enter the mnemonic phrase for this share:")
+		reader := bufio.NewScanner(os.Stdin)
+		if !reader.Scan() {
+			return nil, fmt.Errorf("failed to read mnemonic")
+		}
+		shareMnemonic := strings.TrimSpace(reader.Text())
+
+		if !bip39.IsMnemonicValid(shareMnemonic) {
+			return nil, fmt.Errorf("invalid mnemonic phrase")
 		}
 
-		data, err := hex.DecodeString(dataHex)
+		entropy, err := bip39.EntropyFromMnemonic(shareMnemonic)
 		if err != nil {
-			return nil, fmt.Errorf("invalid data format")
+			return nil, fmt.Errorf("failed to process mnemonic: %w", err)
 		}
 
 		shares = append(shares, command.ShareInfo{
 			Identifier: identifier[0],
-			Data:       data,
+			Data:       entropy,
 		})
 	}
 	return shares, nil
@@ -94,23 +99,30 @@ func readSharesFromDirectory(directory string) ([]command.ShareInfo, error) {
 			return nil, fmt.Errorf("invalid share file format")
 		}
 
-		var identifierHex, dataHex string
+		var identifierHex string
 		fmt.Sscanf(lines[0], "Identifier: %s", &identifierHex)
-		fmt.Sscanf(lines[1], "Data: %s", &dataHex)
+
+		var shareMnemonic string
+		fmt.Sscanf(lines[1], "Mnemonic: %s", &shareMnemonic)
+		shareMnemonic = strings.TrimPrefix(lines[1], "Mnemonic: ")
 
 		identifier, err := hex.DecodeString(identifierHex)
 		if err != nil || len(identifier) != 1 {
 			return nil, fmt.Errorf("invalid identifier format in file")
 		}
 
-		data, err := hex.DecodeString(dataHex)
+		if !bip39.IsMnemonicValid(shareMnemonic) {
+			return nil, fmt.Errorf("invalid mnemonic in file")
+		}
+
+		entropy, err := bip39.EntropyFromMnemonic(shareMnemonic)
 		if err != nil {
-			return nil, fmt.Errorf("invalid data format in file")
+			return nil, fmt.Errorf("failed to process mnemonic: %w", err)
 		}
 
 		shares = append(shares, command.ShareInfo{
 			Identifier: identifier[0],
-			Data:       data,
+			Data:       entropy,
 		})
 	}
 	return shares, nil

@@ -33,6 +33,6 @@ func Recover(shares []ShareInfo) error {
 	}
 
 	fmt.Println("Recovered mnemonic phrase:")
-	fmt.Println(mnemonic)
+	fmt.Printf("\n%s\n", mnemonic)
 	return nil
 }
