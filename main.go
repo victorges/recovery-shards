@@ -70,34 +70,36 @@ func promptForShares(count int) ([]model.MnemonicShare, error) {
 	return shares, nil
 }
 
-func readMnemonicLine(content string) (string, error) {
-	lines := strings.Split(content, "\n")
-	if len(lines) < 1 {
-		return "", fmt.Errorf("empty file")
-	}
-
-	mnemonic := strings.TrimPrefix(lines[0], "Mnemonic: ")
-	mnemonic = strings.TrimSpace(mnemonic)
-
-	// Validate each word
-	words := strings.Split(mnemonic, " ")
-	if len(words) != 24 {
-		return "", fmt.Errorf("mnemonic must contain exactly 24 words")
+func readMnemonicLine(content string) ([]byte, string, error) {
+	words := strings.Fields(content)
+	identifier := []byte(nil)
+	if len(words) == 25 {
+		if len(words[0]) != 3 || words[0][2] != ':' {
+			return nil, "", fmt.Errorf("invalid identifier format must be a hex byte followed by a colon")
+		}
+		var err error
+		identifier, err = hex.DecodeString(words[0][:2])
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid identifier hex code: %w", err)
+		}
+		words = words[1:]
+	} else if len(words) != 24 {
+		return nil, "", fmt.Errorf("mnemonic must contain exactly 24 words")
 	}
 
 	for _, word := range words {
 		if _, ok := bip39.GetWordIndex(word); !ok {
-			return "", fmt.Errorf("invalid word in mnemonic: %s", word)
+			return nil, "", fmt.Errorf("invalid word in mnemonic: %s", word)
 		}
 	}
 
-	return mnemonic, nil
+	return identifier, strings.Join(words, " "), nil
 }
 
-func readMnemonicFromFile(filepath string) (string, error) {
+func readMnemonicFromFile(filepath string) ([]byte, string, error) {
 	content, err := os.ReadFile(filepath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read mnemonic file: %w", err)
+		return nil, "", fmt.Errorf("failed to read mnemonic file: %w", err)
 	}
 
 	return readMnemonicLine(string(content))
@@ -120,19 +122,7 @@ func readSharesFromDirectory(directory string) ([]model.MnemonicShare, error) {
 			return nil, fmt.Errorf("failed to read share file: %w", err)
 		}
 
-		lines := strings.Split(string(content), "\n")
-		if len(lines) != 2 {
-			return nil, fmt.Errorf("invalid share file format")
-		}
-
-		var identifierHex string
-		fmt.Sscanf(lines[0], "Identifier: %s", &identifierHex)
-		identifier, err := hex.DecodeString(identifierHex)
-		if err != nil || len(identifier) != 1 {
-			return nil, fmt.Errorf("invalid identifier format in file")
-		}
-
-		mnemonic, err := readMnemonicLine(lines[1])
+		identifier, mnemonic, err := readMnemonicLine(string(content))
 		if err != nil {
 			return nil, fmt.Errorf("invalid mnemonic in file: %w", err)
 		}
@@ -152,8 +142,8 @@ func writeShares(shares []model.MnemonicShare, outputDir string) error {
 	}
 
 	for i, share := range shares {
-		filename := filepath.Join(outputDir, fmt.Sprintf("share_%d.txt", i+1))
-		content := fmt.Sprintf("Identifier: %02x\nMnemonic: %s", share.Identifier, share.Mnemonic)
+		filename := filepath.Join(outputDir, fmt.Sprintf("share_%02x.txt", share.Identifier))
+		content := fmt.Sprintf("%02x: %s", share.Identifier, share.Mnemonic)
 
 		if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
 			return fmt.Errorf("failed to write share file: %w", err)
@@ -166,7 +156,7 @@ func writeShares(shares []model.MnemonicShare, outputDir string) error {
 func printShares(shares []model.MnemonicShare) {
 	fmt.Println("Shares:")
 	for i, share := range shares {
-		fmt.Printf("Share %d:\n\tIdentifier: %02x\n\tMnemonic: %s\n", i+1, share.Identifier, share.Mnemonic)
+		fmt.Printf("Share %d: %02x: %s\n", i+1, share.Identifier, share.Mnemonic)
 	}
 }
 
@@ -187,15 +177,33 @@ func main() {
 	}
 
 	switch os.Args[1] {
+	case "generate":
+		entropy, err := bip39.NewEntropy(256)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		mnemonic, err := bip39.NewMnemonic(entropy)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+		}
+
+		fmt.Println("Generated mnemonic:")
+		fmt.Printf("\n%s\n", mnemonic)
 	case "split":
 		splitCmd.Parse(os.Args[2:])
 		var mnemonic string
 		var err error
 
 		if *splitInputFile != "" {
-			mnemonic, err = readMnemonicFromFile(*splitInputFile)
+			var identifier []byte
+			identifier, mnemonic, err = readMnemonicFromFile(*splitInputFile)
 			if err != nil {
 				fmt.Printf("Error reading input file: %v\n", err)
+				os.Exit(1)
+			} else if identifier != nil {
+				fmt.Printf("Unexpected identifier in input file: %02x\n", identifier)
 				os.Exit(1)
 			}
 		} else {
