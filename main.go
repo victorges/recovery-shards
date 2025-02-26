@@ -70,6 +70,39 @@ func promptForShares(count int) ([]model.MnemonicShare, error) {
 	return shares, nil
 }
 
+func readMnemonicLine(content string) (string, error) {
+	lines := strings.Split(content, "\n")
+	if len(lines) < 1 {
+		return "", fmt.Errorf("empty file")
+	}
+
+	mnemonic := strings.TrimPrefix(lines[0], "Mnemonic: ")
+	mnemonic = strings.TrimSpace(mnemonic)
+
+	// Validate each word
+	words := strings.Split(mnemonic, " ")
+	if len(words) != 24 {
+		return "", fmt.Errorf("mnemonic must contain exactly 24 words")
+	}
+
+	for _, word := range words {
+		if _, ok := bip39.GetWordIndex(word); !ok {
+			return "", fmt.Errorf("invalid word in mnemonic: %s", word)
+		}
+	}
+
+	return mnemonic, nil
+}
+
+func readMnemonicFromFile(filepath string) (string, error) {
+	content, err := os.ReadFile(filepath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read mnemonic file: %w", err)
+	}
+
+	return readMnemonicLine(string(content))
+}
+
 func readSharesFromDirectory(directory string) ([]model.MnemonicShare, error) {
 	files, err := os.ReadDir(directory)
 	if err != nil {
@@ -98,7 +131,11 @@ func readSharesFromDirectory(directory string) ([]model.MnemonicShare, error) {
 		if err != nil || len(identifier) != 1 {
 			return nil, fmt.Errorf("invalid identifier format in file")
 		}
-		mnemonic := strings.TrimPrefix(lines[1], "Mnemonic: ")
+
+		mnemonic, err := readMnemonicLine(lines[1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid mnemonic in file: %w", err)
+		}
 
 		share, err := model.NewMnemonicShare(identifier[0], mnemonic)
 		if err != nil {
@@ -135,13 +172,14 @@ func printShares(shares []model.MnemonicShare) {
 
 func main() {
 	splitCmd := flag.NewFlagSet("split", flag.ExitOnError)
-	splitN := splitCmd.Int("n", 3, "Total number of shares to create (default: 3)")
-	splitK := splitCmd.Int("k", 2, "Threshold number of shares needed to recover the phrase (default: 2)")
-	splitOutput := splitCmd.String("o", "", "Directory to save the shares")
+	splitTotal := splitCmd.Int("n", 3, "Total number of shares to create (default: 3)")
+	splitThreshold := splitCmd.Int("k", 2, "Minimum number of shares needed to recover the phrase (default: 2)")
+	splitInputFile := splitCmd.String("in", "", "File containing the recovery phrase (if not provided, will prompt for input)")
+	splitOutputDir := splitCmd.String("out", "", "Directory to save the generated shares")
 
 	recoverCmd := flag.NewFlagSet("recover", flag.ExitOnError)
-	recoverCount := recoverCmd.Int("c", 0, "Number of shares to input")
-	recoverDir := recoverCmd.String("d", "", "Path to a directory containing share files")
+	recoverShareCount := recoverCmd.Int("shares", 0, "Number of shares to input manually")
+	recoverInputDir := recoverCmd.String("in", "", "Path to a directory containing share files")
 
 	if len(os.Args) < 2 {
 		fmt.Println("Expected 'split' or 'recover' subcommand")
@@ -151,22 +189,33 @@ func main() {
 	switch os.Args[1] {
 	case "split":
 		splitCmd.Parse(os.Args[2:])
-		mnemonic, err := promptForPhrase("Enter your 24-word recovery phrase, one word at a time:")
+		var mnemonic string
+		var err error
+
+		if *splitInputFile != "" {
+			mnemonic, err = readMnemonicFromFile(*splitInputFile)
+			if err != nil {
+				fmt.Printf("Error reading input file: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			mnemonic, err = promptForPhrase("Enter your 24-word recovery phrase, one word at a time:")
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+				os.Exit(1)
+			}
+		}
+
+		shares, err := command.Split(mnemonic, *splitTotal, *splitThreshold)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
 		}
 
-		shares, err := command.Split(mnemonic, *splitN, *splitK)
-		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
-		}
+		fmt.Printf("Generated %d shares with a %d-out-of-%d threshold.\n", *splitTotal, *splitThreshold, *splitTotal)
 
-		fmt.Printf("Generated %d shares with a %d-out-of-%d threshold.\n", *splitN, *splitK, *splitN)
-
-		if *splitOutput != "" {
-			if err := writeShares(shares, *splitOutput); err != nil {
+		if *splitOutputDir != "" {
+			if err := writeShares(shares, *splitOutputDir); err != nil {
 				fmt.Printf("Error: %v\n", err)
 				os.Exit(1)
 			}
@@ -179,20 +228,20 @@ func main() {
 		var shares []model.MnemonicShare
 		var err error
 
-		if *recoverDir != "" {
-			shares, err = readSharesFromDirectory(*recoverDir)
+		if *recoverInputDir != "" {
+			shares, err = readSharesFromDirectory(*recoverInputDir)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
 				os.Exit(1)
 			}
-		} else if *recoverCount > 0 {
-			shares, err = promptForShares(*recoverCount)
+		} else if *recoverShareCount > 0 {
+			shares, err = promptForShares(*recoverShareCount)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
 				os.Exit(1)
 			}
 		} else {
-			fmt.Println("Error: Either --count or --directory must be provided to recover shares")
+			fmt.Println("Error: Either --shares or --in must be provided to recover shares")
 			os.Exit(1)
 		}
 
