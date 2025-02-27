@@ -17,17 +17,14 @@ func TestMnemonicShare(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("create_valid_share", func(t *testing.T) {
-		share, err := NewMnemonicShare(mnemSh.Identifier, mnemSh.Mnemonic)
+		share, err := NewMnemonicShare(hex.EncodeToString(mnemSh.Identifier), mnemSh.Mnemonic)
 		require.NoError(t, err)
 		assert.Equal(t, mnemSh.Identifier, share.Identifier)
 		assert.Equal(t, mnemSh.Mnemonic, share.Mnemonic)
 	})
 
 	t.Run("create_invalid_mnemonic", func(t *testing.T) {
-		identifier, err := hex.DecodeString("01")
-		require.NoError(t, err)
-
-		_, err = NewMnemonicShare(identifier, "not a valid mnemonic")
+		_, err = NewMnemonicShare("0x01", "not a valid mnemonic")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid mnemonic")
 	})
