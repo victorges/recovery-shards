@@ -240,6 +240,7 @@ func RunCLI(args []string) error {
 
 	switch args[1] {
 	case "generate":
+		// generate a random mnemonic. just a helpful command used for testing
 		entropy, err := bip39.NewEntropy(256)
 		if err != nil {
 			return fmt.Errorf("error: %v", err)
