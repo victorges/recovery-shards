@@ -114,6 +114,19 @@ This tool implements Shamir's Secret Sharing, a cryptographic algorithm that div
 3. Each share is converted back to a BIP-39 mnemonic format for easier storage
 4. To recover, the shares are converted back to entropy, combined, and then converted to the original mnemonic
 
+### Share Validation
+
+Each share includes a check byte for validation, calculated as follows:
+
+1. The share identifier and entropy data are XORed together byte by byte
+2. The resulting check byte is appended to the share identifier
+3. When recovering shares, the check byte is validated by recalculating it and comparing
+4. This helps detect transcription errors or corrupted shares before attempting reconstruction
+
+For example, if a share has identifier `01` and data `02 03`, the check byte would be:
+
+01 XOR 02 XOR 03 = 00
+
 ## License
 
 MIT

@@ -109,7 +109,7 @@ func TestXorCheckByte(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := xorCheckByte(tc.identifier, tc.data)
+			result := checksumByte(tc.identifier, tc.data)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
