@@ -217,7 +217,7 @@ func printShares(shares []model.MnemonicShare) {
 	}
 }
 
-func main() {
+func RunCLI(args []string) error {
 	splitCmd := flag.NewFlagSet("split", flag.ExitOnError)
 	splitTotal := splitCmd.Int("n", 3, "Total number of shares to create (default: 3)")
 	splitThreshold := splitCmd.Int("k", 2, "Minimum number of shares needed to recover the phrase (default: 2)")
@@ -228,28 +228,27 @@ func main() {
 	recoverShareCount := recoverCmd.Int("shares", 0, "Number of shares to input manually")
 	recoverInputDir := recoverCmd.String("in", "", "Path to a directory containing share files")
 
-	if len(os.Args) < 2 {
-		fmt.Println("Expected 'split' or 'recover' subcommand")
-		os.Exit(1)
+	if len(args) < 2 {
+		return fmt.Errorf("expected 'split' or 'recover' subcommand")
 	}
 
-	switch os.Args[1] {
+	switch args[1] {
 	case "generate":
 		entropy, err := bip39.NewEntropy(256)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error: %v", err)
 		}
 
 		mnemonic, err := bip39.NewMnemonic(entropy)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			return fmt.Errorf("error: %v", err)
 		}
 
 		fmt.Println("Generated mnemonic:")
 		fmt.Printf("\n%s\n", mnemonic)
+
 	case "split":
-		splitCmd.Parse(os.Args[2:])
+		splitCmd.Parse(args[2:])
 		var mnemonic string
 		var err error
 
@@ -257,79 +256,76 @@ func main() {
 			var identifier []byte
 			identifier, mnemonic, err = readMnemonicFromFile(*splitInputFile)
 			if err != nil {
-				fmt.Printf("Error reading input file: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error reading input file: %v", err)
 			} else if identifier != nil {
-				fmt.Printf("Unexpected identifier in input file: %02x\n", identifier)
-				os.Exit(1)
+				return fmt.Errorf("unexpected identifier in input file: %02x", identifier)
 			}
 		} else {
 			mnemonic, err = promptForPhrase("Enter your 24-word recovery phrase, one word at a time:")
 			if err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error: %v", err)
 			}
 		}
 
 		shares, err := command.Split(mnemonic, *splitTotal, *splitThreshold)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error: %v", err)
 		}
 
 		if err := command.VerifyShares(mnemonic, shares, *splitThreshold); err != nil {
-			fmt.Printf("Error verifying shares: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error verifying shares: %v", err)
 		}
 
 		fmt.Printf("Generated %d shares with a %d-out-of-%d threshold.\n", *splitTotal, *splitThreshold, *splitTotal)
 
 		if *splitOutputDir != "" {
 			if err := writeShares(shares, *splitOutputDir); err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error: %v", err)
 			}
 		}
 		printShares(shares)
 
 	case "recover":
-		recoverCmd.Parse(os.Args[2:])
+		recoverCmd.Parse(args[2:])
 		var shares []model.MnemonicShare
 		var err error
 
 		if *recoverInputDir != "" {
 			shares, err = readSharesFromPath(*recoverInputDir)
 			if err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error: %v", err)
 			}
 		} else if *recoverShareCount > 0 {
 			shares, err = promptForShares(*recoverShareCount)
 			if err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error: %v", err)
 			}
 		} else {
-			fmt.Println("Error: Either --shares or --in must be provided to recover shares")
-			os.Exit(1)
+			return fmt.Errorf("either --shares or --in must be provided to recover shares")
 		}
 
 		if len(shares) < 2 {
-			fmt.Println("Error: At least two shares are required to recover the mnemonic")
-			os.Exit(1)
+			return fmt.Errorf("at least two shares are required to recover the mnemonic")
 		}
 
 		mnemonic, err := command.Recover(shares)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error: %v", err)
 		}
 
 		fmt.Println("Recovered mnemonic phrase:")
 		fmt.Printf("\n%s\n", mnemonic)
 
 	default:
-		fmt.Printf("Unknown command: %s\n", os.Args[1])
+		return fmt.Errorf("unknown command: %s", args[1])
+	}
+
+	return nil
+}
+
+func main() {
+	if err := RunCLI(os.Args); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
