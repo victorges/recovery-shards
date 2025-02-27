@@ -28,6 +28,8 @@ func NewMnemonicShareFromShamir(share []byte) (MnemonicShare, error) {
 	}
 	data := share[:len(share)-shamir.ShareOverhead]
 	identifier := share[len(share)-shamir.ShareOverhead:]
+	identifier = append(identifier, xorCheckByte(identifier, data))
+
 	shareMnemonic, err := bip39.NewMnemonic(data)
 	if err != nil {
 		return MnemonicShare{}, fmt.Errorf("failed to generate mnemonic for share: %w", err)
@@ -43,5 +45,18 @@ func (s MnemonicShare) ToShamir() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid mnemonic: %w", err)
 	}
-	return append(entropy, s.Identifier...), nil
+	checkByte := s.Identifier[len(s.Identifier)-1]
+	onlyID := s.Identifier[:len(s.Identifier)-1]
+	if xorCheckByte(onlyID, entropy) != checkByte {
+		return nil, fmt.Errorf("invalid check byte on share %02x", s.Identifier)
+	}
+	return append(entropy, onlyID...), nil
+}
+
+func xorCheckByte(identifier, data []byte) byte {
+	checkByte := byte(0)
+	for _, b := range append(identifier, data...) {
+		checkByte ^= b
+	}
+	return checkByte
 }

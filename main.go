@@ -74,12 +74,13 @@ func readMnemonicLine(content string) ([]byte, string, error) {
 	words := strings.Fields(content)
 	identifier := []byte(nil)
 	if len(words) == 25 {
-		if len(words[0]) != 3 || words[0][2] != ':' {
-			return nil, "", fmt.Errorf("invalid identifier format must be a hex byte followed by a colon")
+		wordLen := len(words[0])
+		if words[0][wordLen-1] != ':' {
+			return nil, "", fmt.Errorf("invalid identifier format must be 2 hex bytes followed by a colon")
 		}
 		var err error
-		identifier, err = hex.DecodeString(words[0][:2])
-		if err != nil {
+		identifier, err = hex.DecodeString(words[0][:wordLen-1])
+		if err != nil || len(identifier) != 2 {
 			return nil, "", fmt.Errorf("invalid identifier hex code: %w", err)
 		}
 		words = words[1:]
