@@ -182,7 +182,7 @@ func writeShares(shares []model.MnemonicShare, outputPath string) error {
 	if isDir {
 		// Ensure directory exists
 		dirPath := strings.TrimRight(outputPath, "/\\")
-		if err := os.MkdirAll(dirPath, 0755); err != nil {
+		if err := os.MkdirAll(dirPath, 0700); err != nil {
 			return fmt.Errorf("failed to create output directory: %w", err)
 		}
 
@@ -190,7 +190,7 @@ func writeShares(shares []model.MnemonicShare, outputPath string) error {
 		for i, share := range shares {
 			filename := filepath.Join(dirPath, fmt.Sprintf("share_%04x.txt", share.Identifier))
 
-			if err := os.WriteFile(filename, []byte(share.String()), 0644); err != nil {
+			if err := os.WriteFile(filename, []byte(share.String()), 0600); err != nil {
 				return fmt.Errorf("failed to write share file: %w", err)
 			}
 			fmt.Printf("Saved share %d to %s\n", i+1, filename)
@@ -202,7 +202,7 @@ func writeShares(shares []model.MnemonicShare, outputPath string) error {
 			fmt.Fprintln(&content, share)
 		}
 
-		if err := os.WriteFile(outputPath, []byte(content.String()), 0644); err != nil {
+		if err := os.WriteFile(outputPath, []byte(content.String()), 0600); err != nil {
 			return fmt.Errorf("failed to write shares file: %w", err)
 		}
 		fmt.Printf("Saved %d shares to %s\n", len(shares), outputPath)
