@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
@@ -47,14 +46,9 @@ func promptForShares(count int) ([]model.MnemonicShare, error) {
 		fmt.Printf("\nShare %d:\n", i+1)
 		fmt.Print("Identifier (hex): ")
 
-		var identifierHex string
-		if _, err := fmt.Scanln(&identifierHex); err != nil {
+		var identifier string
+		if _, err := fmt.Scanln(&identifier); err != nil {
 			return nil, fmt.Errorf("failed to read identifier: %w", err)
-		}
-
-		identifier, err := hex.DecodeString(identifierHex)
-		if err != nil || len(identifier) != 1 {
-			return nil, fmt.Errorf("invalid identifier format")
 		}
 
 		mnemonic, err := promptForPhrase("Enter the mnemonic phrase for this share:")
@@ -71,37 +65,29 @@ func promptForShares(count int) ([]model.MnemonicShare, error) {
 	return shares, nil
 }
 
-func readMnemonicLine(content string) ([]byte, string, error) {
+func readMnemonicLine(content string) (string, string, error) {
 	words := strings.Fields(content)
-	identifier := []byte(nil)
+	identifier := ""
 	if len(words) == 25 {
-		wordLen := len(words[0])
-		if words[0][wordLen-1] != ':' {
-			return nil, "", fmt.Errorf("invalid identifier format must be 2 hex bytes followed by a colon")
-		}
-		var err error
-		identifier, err = hex.DecodeString(words[0][:wordLen-1])
-		if err != nil || len(identifier) != 2 {
-			return nil, "", fmt.Errorf("invalid identifier hex code: %w", err)
-		}
+		identifier = words[0]
 		words = words[1:]
 	} else if len(words) != 24 {
-		return nil, "", fmt.Errorf("mnemonic must contain exactly 24 words")
+		return "", "", fmt.Errorf("mnemonic must contain exactly 24 words")
 	}
 
 	for _, word := range words {
 		if _, ok := bip39.GetWordIndex(word); !ok {
-			return nil, "", fmt.Errorf("invalid word in mnemonic: %s", word)
+			return "", "", fmt.Errorf("invalid word in mnemonic: %s", word)
 		}
 	}
 
 	return identifier, strings.Join(words, " "), nil
 }
 
-func readMnemonicFromFile(filepath string) ([]byte, string, error) {
+func readMnemonicFromFile(filepath string) (string, string, error) {
 	content, err := os.ReadFile(filepath)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to read mnemonic file: %w", err)
+		return "", "", fmt.Errorf("failed to read mnemonic file: %w", err)
 	}
 
 	return readMnemonicLine(string(content))
@@ -124,7 +110,7 @@ func readSharesFromFile(filepath string) ([]model.MnemonicShare, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid mnemonic line: %w", err)
 		}
-		if identifier == nil {
+		if identifier == "" {
 			return nil, fmt.Errorf("share file must contain identifiers")
 		}
 
@@ -260,11 +246,11 @@ func RunCLI(args []string) error {
 		var err error
 
 		if *splitInputFile != "" {
-			var identifier []byte
+			var identifier string
 			identifier, mnemonic, err = readMnemonicFromFile(*splitInputFile)
 			if err != nil {
 				return fmt.Errorf("error reading input file: %v", err)
-			} else if identifier != nil {
+			} else if identifier != "" {
 				return fmt.Errorf("unexpected identifier in mnemonic file: %04x", identifier)
 			}
 		} else {

@@ -1,7 +1,9 @@
 package model
 
 import (
+	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/vault/shamir"
 	"github.com/tyler-smith/go-bip39"
@@ -17,19 +19,27 @@ type MnemonicShare struct {
 }
 
 // NewMnemonicShare creates a new share with the given identifier and mnemonic.
-// The identifier must include a valid checksum byte as its last byte.
-// The checksum byte is calculated by XORing all bytes of the identifier (excluding the checksum)
-// with all bytes of the mnemonic's entropy.
+// The identifier must be in hex format (0x optional) and include a valid
+// checksum byte as its last byte. It can also have a colon at the end.
+// The checksum byte is calculated by XORing all bytes of the identifier
+// (excluding the checksum) with all bytes of the mnemonic's entropy.
 //
 // Returns an error if:
+// - The identifier is not a valid hex string
 // - The mnemonic is not a valid BIP39 mnemonic
 // - The checksum byte in the identifier is invalid
-func NewMnemonicShare(identifier []byte, mnemonic string) (MnemonicShare, error) {
+func NewMnemonicShare(identifier, mnemonic string) (MnemonicShare, error) {
+	identifier = strings.TrimSpace(identifier)
+	identifier = strings.TrimSuffix(strings.TrimPrefix(identifier, "0x"), ":")
+	identifierBytes, err := hex.DecodeString(identifier)
+	if err != nil {
+		return MnemonicShare{}, fmt.Errorf("invalid identifier: %w", err)
+	}
 	if !bip39.IsMnemonicValid(mnemonic) {
 		return MnemonicShare{}, fmt.Errorf("invalid mnemonic")
 	}
 	share := MnemonicShare{
-		Identifier: identifier,
+		Identifier: identifierBytes,
 		Mnemonic:   mnemonic,
 	}
 	// Validate the checksum byte by attempting to convert to Shamir format
@@ -94,7 +104,7 @@ func (s MnemonicShare) ToShamir() ([]byte, error) {
 // String returns a human-readable string representation of the share.
 // The string includes the identifier in hexadecimal and the mnemonic phrase.
 func (s MnemonicShare) String() string {
-	return fmt.Sprintf("%04x: %s", s.Identifier, s.Mnemonic)
+	return fmt.Sprintf("0x%04x: %s", s.Identifier, s.Mnemonic)
 }
 
 // checksumByte calculates a checksum byte by XORing all bytes in the identifier
