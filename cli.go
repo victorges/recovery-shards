@@ -14,6 +14,9 @@ import (
 	"github.com/victorges/recovery-shards/model"
 )
 
+// Version is set during build via ldflags
+var Version = "dev"
+
 func promptForPhrase(prompt string) (string, error) {
 	fmt.Println(prompt)
 	words := make([]string, 0, 24)
@@ -218,6 +221,12 @@ func printShares(shares []model.MnemonicShare) {
 }
 
 func RunCLI(args []string) error {
+	// Check for version flag
+	if len(args) > 1 && (args[1] == "-v" || args[1] == "--version" || args[1] == "version") {
+		fmt.Printf("recovery-shards version %s\n", Version)
+		return nil
+	}
+
 	splitCmd := flag.NewFlagSet("split", flag.ExitOnError)
 	splitTotal := splitCmd.Int("n", 3, "Total number of shares to create (default: 3)")
 	splitThreshold := splitCmd.Int("k", 2, "Minimum number of shares needed to recover the phrase (default: 2)")
@@ -229,7 +238,7 @@ func RunCLI(args []string) error {
 	recoverInputDir := recoverCmd.String("in", "", "Path to a directory containing share files")
 
 	if len(args) < 2 {
-		return fmt.Errorf("expected 'split' or 'recover' subcommand")
+		return fmt.Errorf("expected 'split', 'recover', or 'version' subcommand")
 	}
 
 	switch args[1] {
