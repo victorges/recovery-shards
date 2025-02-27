@@ -61,7 +61,7 @@ func promptForShares(count int) ([]model.MnemonicShare, error) {
 		}
 		mnemonic := strings.TrimSpace(reader.Text())
 
-		share, err := model.NewMnemonicShare(identifier[0], mnemonic)
+		share, err := model.NewMnemonicShare(identifier, mnemonic)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create mnemonic share: %w", err)
 		}
@@ -127,7 +127,7 @@ func readSharesFromDirectory(directory string) ([]model.MnemonicShare, error) {
 			return nil, fmt.Errorf("invalid mnemonic in file: %w", err)
 		}
 
-		share, err := model.NewMnemonicShare(identifier[0], mnemonic)
+		share, err := model.NewMnemonicShare(identifier, mnemonic)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create mnemonic share: %w", err)
 		}
@@ -217,6 +217,11 @@ func main() {
 		shares, err := command.Split(mnemonic, *splitTotal, *splitThreshold)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		if err := command.VerifyShares(mnemonic, shares, *splitThreshold); err != nil {
+			fmt.Printf("Error verifying shares: %v\n", err)
 			os.Exit(1)
 		}
 

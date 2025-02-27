@@ -8,11 +8,11 @@ import (
 )
 
 type MnemonicShare struct {
-	Identifier byte
+	Identifier []byte
 	Mnemonic   string
 }
 
-func NewMnemonicShare(identifier byte, mnemonic string) (MnemonicShare, error) {
+func NewMnemonicShare(identifier []byte, mnemonic string) (MnemonicShare, error) {
 	if !bip39.IsMnemonicValid(mnemonic) {
 		return MnemonicShare{}, fmt.Errorf("invalid mnemonic")
 	}
@@ -27,7 +27,7 @@ func NewMnemonicShareFromShamir(share []byte) (MnemonicShare, error) {
 		return MnemonicShare{}, fmt.Errorf("invalid share length")
 	}
 	data := share[:len(share)-shamir.ShareOverhead]
-	identifier := share[len(share)-shamir.ShareOverhead]
+	identifier := share[len(share)-shamir.ShareOverhead:]
 	shareMnemonic, err := bip39.NewMnemonic(data)
 	if err != nil {
 		return MnemonicShare{}, fmt.Errorf("failed to generate mnemonic for share: %w", err)
@@ -43,5 +43,5 @@ func (s MnemonicShare) ToShamir() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid mnemonic: %w", err)
 	}
-	return append(entropy, s.Identifier), nil
+	return append(entropy, s.Identifier...), nil
 }

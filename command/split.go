@@ -34,3 +34,36 @@ func Split(mnemonic string, n, k int) ([]model.MnemonicShare, error) {
 
 	return result, nil
 }
+
+func VerifyShares(originalMnemonic string, shares []model.MnemonicShare, k int) error {
+	if len(shares) < k {
+		return fmt.Errorf("not enough shares to verify")
+	}
+
+	for _, combination := range generateCombinations(shares, k) {
+		mnemonic, err := Recover(combination)
+		if err != nil {
+			return fmt.Errorf("failed to recover mnemonic: %w", err)
+		}
+		if mnemonic != originalMnemonic {
+			return fmt.Errorf("mnemonic does not match")
+		}
+	}
+
+	return nil
+}
+
+func generateCombinations(shares []model.MnemonicShare, k int) [][]model.MnemonicShare {
+	if k > len(shares) {
+		return [][]model.MnemonicShare{}
+	} else if k == 0 {
+		return [][]model.MnemonicShare{{}}
+	}
+
+	combsWith := generateCombinations(shares[1:], k-1)
+	for i, comb := range combsWith {
+		combsWith[i] = append([]model.MnemonicShare{shares[0]}, comb...)
+	}
+	combsWithout := generateCombinations(shares[1:], k)
+	return append(combsWith, combsWithout...)
+}
