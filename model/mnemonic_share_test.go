@@ -1,7 +1,6 @@
 package model
 
 import (
-	"encoding/hex"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,10 +23,7 @@ func TestMnemonicShare(t *testing.T) {
 	})
 
 	t.Run("create_invalid_mnemonic", func(t *testing.T) {
-		identifier, err := hex.DecodeString("01")
-		require.NoError(t, err)
-
-		_, err = NewMnemonicShare(identifier, "not a valid mnemonic")
+		_, err = NewMnemonicShare("failed", "not a valid mnemonic")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid mnemonic")
 	})
@@ -62,14 +58,14 @@ func TestMnemonicShare(t *testing.T) {
 
 	t.Run("invalid_check_byte", func(t *testing.T) {
 		// Create a valid share
-		identifier, err := hex.DecodeString("01")
-		require.NoError(t, err)
+		// identifier, err := hex.DecodeString("01")
+		// require.NoError(t, err)
 
 		// Add a check byte
-		identifierWithCheck := append(identifier, 0xFF) // Invalid check byte
+		// identifierWithCheck := append(identifier, 0xFF) // Invalid check byte
 
 		share := MnemonicShare{
-			Identifier: identifierWithCheck,
+			Identifier: "failed",
 			Mnemonic:   mnemSh.Mnemonic,
 		}
 
@@ -109,7 +105,7 @@ func TestXorCheckByte(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := checksumByte(tc.identifier, tc.data)
+			result := checksumTribblet(tc.identifier, tc.data)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
