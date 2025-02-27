@@ -13,17 +13,14 @@ func TestMnemonicShare(t *testing.T) {
 	// Generate a valid mnemonic for testing
 	entropy, err := bip39.NewEntropy(256)
 	require.NoError(t, err)
-	mnemonic, err := bip39.NewMnemonic(entropy)
+	mnemSh, err := NewMnemonicShareFromShamir(append(entropy, 0xee))
 	require.NoError(t, err)
 
 	t.Run("create_valid_share", func(t *testing.T) {
-		identifier, err := hex.DecodeString("01")
+		share, err := NewMnemonicShare(mnemSh.Identifier, mnemSh.Mnemonic)
 		require.NoError(t, err)
-
-		share, err := NewMnemonicShare(identifier, mnemonic)
-		require.NoError(t, err)
-		assert.Equal(t, identifier, share.Identifier)
-		assert.Equal(t, mnemonic, share.Mnemonic)
+		assert.Equal(t, mnemSh.Identifier, share.Identifier)
+		assert.Equal(t, mnemSh.Mnemonic, share.Mnemonic)
 	})
 
 	t.Run("create_invalid_mnemonic", func(t *testing.T) {
@@ -73,7 +70,7 @@ func TestMnemonicShare(t *testing.T) {
 
 		share := MnemonicShare{
 			Identifier: identifierWithCheck,
-			Mnemonic:   mnemonic,
+			Mnemonic:   mnemSh.Mnemonic,
 		}
 
 		// Try to convert to Shamir
