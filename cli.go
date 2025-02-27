@@ -322,10 +322,3 @@ func RunCLI(args []string) error {
 
 	return nil
 }
-
-func main() {
-	if err := RunCLI(os.Args); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-}
