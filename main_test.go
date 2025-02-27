@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/tyler-smith/go-bip39"
+	"github.com/victorges/recovery-shards/model"
 )
 
 func TestCLIEndToEnd(t *testing.T) {
@@ -175,11 +176,11 @@ func TestInvalidInputs(t *testing.T) {
 	t.Run("insufficient_shares", func(t *testing.T) {
 		entropy, err := bip39.NewEntropy(256)
 		require.NoError(t, err)
-		share, err := bip39.NewMnemonic(entropy)
+		mnemSh, err := model.NewMnemonicShareFromShamir(append(entropy, 0x01))
 		require.NoError(t, err)
 
 		sharesFile := filepath.Join(t.TempDir(), "shares.txt")
-		err = os.WriteFile(sharesFile, []byte(fmt.Sprintf("3ba2: %s", share)), 0644)
+		err = os.WriteFile(sharesFile, []byte(fmt.Sprintf("%02x: %s", mnemSh.Identifier, mnemSh.Mnemonic)), 0644)
 		require.NoError(t, err)
 
 		err = RunCLI([]string{

@@ -16,10 +16,15 @@ func NewMnemonicShare(identifier []byte, mnemonic string) (MnemonicShare, error)
 	if !bip39.IsMnemonicValid(mnemonic) {
 		return MnemonicShare{}, fmt.Errorf("invalid mnemonic")
 	}
-	return MnemonicShare{
+	share := MnemonicShare{
 		Identifier: identifier,
 		Mnemonic:   mnemonic,
-	}, nil
+	}
+	// check the check byte
+	if _, err := share.ToShamir(); err != nil {
+		return MnemonicShare{}, fmt.Errorf("invalid share: %w", err)
+	}
+	return share, nil
 }
 
 func NewMnemonicShareFromShamir(share []byte) (MnemonicShare, error) {
