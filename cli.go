@@ -57,12 +57,10 @@ func promptForShares(count int) ([]model.MnemonicShare, error) {
 			return nil, fmt.Errorf("invalid identifier format")
 		}
 
-		fmt.Println("Enter the mnemonic phrase for this share:")
-		reader := bufio.NewScanner(os.Stdin)
-		if !reader.Scan() {
-			return nil, fmt.Errorf("failed to read mnemonic")
+		mnemonic, err := promptForPhrase("Enter the mnemonic phrase for this share:")
+		if err != nil {
+			return nil, fmt.Errorf("failed to read mnemonic: %w", err)
 		}
-		mnemonic := strings.TrimSpace(reader.Text())
 
 		share, err := model.NewMnemonicShare(identifier, mnemonic)
 		if err != nil {
@@ -190,10 +188,9 @@ func writeShares(shares []model.MnemonicShare, outputPath string) error {
 
 		// Write individual files
 		for i, share := range shares {
-			filename := filepath.Join(dirPath, fmt.Sprintf("share_%02x.txt", share.Identifier))
-			content := fmt.Sprintf("%02x: %s", share.Identifier, share.Mnemonic)
+			filename := filepath.Join(dirPath, fmt.Sprintf("share_%04x.txt", share.Identifier))
 
-			if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
+			if err := os.WriteFile(filename, []byte(share.String()), 0644); err != nil {
 				return fmt.Errorf("failed to write share file: %w", err)
 			}
 			fmt.Printf("Saved share %d to %s\n", i+1, filename)
@@ -202,7 +199,7 @@ func writeShares(shares []model.MnemonicShare, outputPath string) error {
 		// Write single file with all shares
 		var content strings.Builder
 		for _, share := range shares {
-			fmt.Fprintf(&content, "%02x: %s\n", share.Identifier, share.Mnemonic)
+			fmt.Fprintln(&content, share)
 		}
 
 		if err := os.WriteFile(outputPath, []byte(content.String()), 0644); err != nil {
@@ -216,7 +213,7 @@ func writeShares(shares []model.MnemonicShare, outputPath string) error {
 func printShares(shares []model.MnemonicShare) {
 	fmt.Println("Shares:")
 	for _, share := range shares {
-		fmt.Printf("%02x: %s\n", share.Identifier, share.Mnemonic)
+		fmt.Println(share)
 	}
 }
 
@@ -267,7 +264,7 @@ func RunCLI(args []string) error {
 			if err != nil {
 				return fmt.Errorf("error reading input file: %v", err)
 			} else if identifier != nil {
-				return fmt.Errorf("unexpected identifier in input file: %02x", identifier)
+				return fmt.Errorf("unexpected identifier in mnemonic file: %04x", identifier)
 			}
 		} else {
 			mnemonic, err = promptForPhrase("Enter your 24-word recovery phrase, one word at a time:")

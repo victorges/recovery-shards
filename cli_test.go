@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -180,7 +179,7 @@ func TestInvalidInputs(t *testing.T) {
 		require.NoError(t, err)
 
 		sharesFile := filepath.Join(t.TempDir(), "shares.txt")
-		err = os.WriteFile(sharesFile, []byte(fmt.Sprintf("%02x: %s", mnemSh.Identifier, mnemSh.Mnemonic)), 0644)
+		err = os.WriteFile(sharesFile, []byte(mnemSh.String()), 0644)
 		require.NoError(t, err)
 
 		err = RunCLI([]string{

@@ -85,10 +85,16 @@ func (s MnemonicShare) ToShamir() ([]byte, error) {
 	}
 	checksum := s.Identifier[len(s.Identifier)-1]
 	onlyID := s.Identifier[:len(s.Identifier)-1]
-	if checksumByte(onlyID, entropy) != checksum {
-		return nil, fmt.Errorf("invalid check byte on share %02x", s.Identifier)
+	if expectedChecksum := checksumByte(onlyID, entropy); expectedChecksum != checksum {
+		return nil, fmt.Errorf("invalid checksum on share %04x (expected: %02x, got: %02x)", s.Identifier, expectedChecksum, checksum)
 	}
 	return append(entropy, onlyID...), nil
+}
+
+// String returns a human-readable string representation of the share.
+// The string includes the identifier in hexadecimal and the mnemonic phrase.
+func (s MnemonicShare) String() string {
+	return fmt.Sprintf("%04x: %s", s.Identifier, s.Mnemonic)
 }
 
 // checksumByte calculates a checksum byte by XORing all bytes in the identifier
