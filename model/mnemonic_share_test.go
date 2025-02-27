@@ -76,7 +76,7 @@ func TestMnemonicShare(t *testing.T) {
 		// Try to convert to Shamir
 		_, err = share.ToShamir()
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid check byte")
+		assert.Contains(t, err.Error(), "invalid checksum on share")
 	})
 }
 
